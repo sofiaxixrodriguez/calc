@@ -1,12 +1,15 @@
-
 from libr.UtilLibrary.LinkElementsInterface import LinkElementsInterface
+
 from src.controller.ControllerBuilder import ControllerBuilder
 from src.event.EventBuilder import EventBuilder
 from src.model.ModelBuilder import ModelBuilder
 from src.view.ViewBuilder import ViewBuilder
 
+from src.Init import EventType
+
 
 class LinkElements(LinkElementsInterface):
+
     def __init__(self, mainWindow):
         LinkElementsInterface.__init__(self)
         self.modelBuilder = ModelBuilder()
@@ -14,27 +17,80 @@ class LinkElements(LinkElementsInterface):
         self.controllerBuilder = ControllerBuilder()
         self.eventBuilder = EventBuilder()
 
+    # ==================================================
+    # CONTROLLER -> VIEWS / MODELS
+    # ==================================================
     def linkControllers(self):
-        self.controllerBuilder.getElement(''). \
-            setAsociatedViews(self.viewBuilder.getElement(''))
-        self.controllerBuilder.getElement(''). \
-            setAsociatedModels(self.modelBuilder.getElement(''))
+        # DisplayOutputController sees the view and the display model
+        displayCtrl = self.controllerBuilder.getElement("DisplayOutputController")
+        displayCtrl.setAsociatedViews(
+            self.viewBuilder.getElement("TerminalView")
+        )
+        displayCtrl.setAsociatedModels(
+            self.modelBuilder.getElement("DisplayOutputModel")
+        )
 
+        # ExecuteOperationController needs the operation model
+        execCtrl = self.controllerBuilder.getElement("ExecuteOperationController")
+        execCtrl.setAsociatedModels(
+            self.modelBuilder.getElement("ExecuteOperationModel"),
+            self.modelBuilder.getElement("DisplayOutputModel")
+        )
+
+        # SelectModeController needs the mode model
+        self.controllerBuilder.getElement("SelectModeController").setAsociatedModels(
+            self.modelBuilder.getElement("SelectModeModel")
+        )
+
+    # ==================================================
+    # VIEW -> MODELS / EVENTS
+    # ==================================================
     def linkViews(self):
-        self.viewBuilder.getElement(''). \
-            setAsociatedModels(self.modelBuilder.getElement(''))
-        self.viewBuilder.getElement(('')). \
-            addEvent(self.eventBuilder.getElement(''))
+        terminalView = self.viewBuilder.getElement("TerminalView")
+        terminalView.addEvent(
+            self.eventBuilder.getElement("ModeSwitchEvent"),
+            self.eventBuilder.getElement("ExecuteOperationEvent"),
+            self.eventBuilder.getElement("RecieveDataEvent"),
+            self.eventBuilder.getElement("SeedEvent")
+        )
 
+    # ==================================================
+    # MODELS -> EVENTS
+    # ==================================================
     def linkModels(self):
-        self.modelBuilder.getElement(('')). \
-            addEvent(self.eventBuilder.getElement(''))
+        updateEvent = self.eventBuilder.getElement("UpdateDataEvent")
 
+        for modelName in ("DisplayOutputModel",
+                          "ExecuteOperationModel",
+                          "SelectModeModel"):
+            self.modelBuilder.getElement(modelName).addEvent(updateEvent)
+
+    # ==================================================
+    # EVENT -> SUBSCRIBERS
+    # ==================================================
     def registerEvents(self):
-        self.eventBuilder.getElement(''). \
-            register(self.controllerBuilder.getElement(''))
-        self.eventBuilder.getElement(''). \
-            register(self.viewBuilder.getElement(''))
+        self.eventBuilder.getElement("ModeSwitchEvent").register(
+            self.controllerBuilder.getElement("SelectModeController")
+        )
+        self.eventBuilder.getElement("ExecuteOperationEvent").register(
+            self.controllerBuilder.getElement("ExecuteOperationController")
+        )
+        self.eventBuilder.getElement("RecieveDataEvent").register(
+            self.controllerBuilder.getElement("ExecuteOperationController")
+        )
+        self.eventBuilder.getElement("SeedEvent").register(
+            self.controllerBuilder.getElement("ExecuteOperationController")
+        )
+        self.eventBuilder.getElement("UpdateDataEvent").register(
+            self.controllerBuilder.getElement("DisplayOutputController")
+        )
 
+    # ==================================================
+    # KICK-OFF
+    # ==================================================
     def initElements(self):
-        pass
+        updateEvent = self.eventBuilder.getElement("UpdateDataEvent")
+        updateEvent.setStep(EventType.MODE)
+        updateEvent.setType(None)
+        updateEvent.setData(None)
+        updateEvent.notifyAll()

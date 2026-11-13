@@ -1,26 +1,22 @@
-from PyQt6.QtWidgets import QApplication
 import sys
 from src.view.TerminalView import TerminalView
 from src.linker.LinkElements import LinkElements
-from src.widget.MainWindow import MainWindow
-
 
 class Application:
     def __init__(self):
+        self.__initCalculatorElements()
 
-        app = QApplication(sys.argv)
-        self.mainWindow = MainWindow()
-        self.__initDocumentViewerElements()
-        sys.exit(app.exec_())
-
-    def __initDocumentViewerElements(self):
-        documentViewerLinker = LinkElements(self.mainWindow)
-        documentViewerLinker.linkViews()
-        documentViewerLinker.linkControllers()
-        documentViewerLinker.linkModels()
-        documentViewerLinker.registerEvents()
-        documentViewerLinker.initElements()
+    def __initCalculatorElements(self):
+        linker = LinkElements(mainWindow=None)
+        linker.linkViews()
+        linker.linkControllers()
+        linker.linkModels()
+        linker.registerEvents()
+        linker.initElements()
 
 
 if __name__ == "__main__":
-    Application()
+    try:
+        Application()
+    except (SystemExit, KeyboardInterrupt):
+        pass

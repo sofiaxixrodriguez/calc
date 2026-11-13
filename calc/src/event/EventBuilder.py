@@ -1,4 +1,3 @@
-
 from libr.UtilLibrary.Singleton import SingletonMeta
 from libr.UtilLibrary.ObjectBuilder import ObjectBuilder
 
@@ -6,6 +5,8 @@ from src.event.ExecuteOperationEvent import ExecuteOperationEvent
 from src.event.ModeSwitchEvent import ModeSwitchEvent
 from src.event.RecieveDataEvent import RecieveDataEvent
 from src.event.UpdateDataEvent import UpdateDataEvent
+from src.event.SeedEvent import SeedEvent
+
 
 class EventBuilder(ObjectBuilder, metaclass=SingletonMeta):
     def __init__(self):
@@ -14,5 +15,6 @@ class EventBuilder(ObjectBuilder, metaclass=SingletonMeta):
             "ExecuteOperationEvent": ExecuteOperationEvent(),
             "ModeSwitchEvent": ModeSwitchEvent(),
             "RecieveDataEvent": RecieveDataEvent(),
-            "UpdateDataEvent": UpdateDataEvent()
+            "UpdateDataEvent": UpdateDataEvent(),
+            "SeedEvent": SeedEvent()
         }

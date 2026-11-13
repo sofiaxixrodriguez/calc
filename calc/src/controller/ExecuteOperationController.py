@@ -5,6 +5,7 @@ from multipledispatch import dispatch
 
 from src.event.ExecuteOperationEvent import ExecuteOperationEvent
 from src.event.RecieveDataEvent import RecieveDataEvent
+from src.event.SeedEvent import SeedEvent
 
 from src.Init import Operations
 
@@ -32,6 +33,14 @@ class ExecuteOperationController(AbstractController, Subscriber):
         self.executeOperationModel = executeOperationModel
         self.displayOutputModel = displayOutputModel
 
+    # ==================================================
+    # SEED (starter number)
+    # ==================================================
+    
+    @dispatch(SeedEvent)
+    def onEventReceived(self, event):
+        self.executeOperationModel.setSeed(event.getValue())
+    
     # ==================================================
     # OPERATION SELECTION
     # ==================================================
