@@ -3,7 +3,7 @@ import sys
 from libr.UtilLibrary.Subscriber import Subscriber
 from libr.UtilLibrary.Publisher import Publisher
 
-from src.Init import Modes, Operations, EventType
+from src.Init import Modes, Operations, EventType, OutputType
 
 
 class TerminalView(Subscriber, Publisher):
@@ -14,23 +14,25 @@ class TerminalView(Subscriber, Publisher):
 
         self.__text = ""
         self.__step = EventType.MODE
+        self.__eventType = None
         self.__operandsNeeded = 1
-        self.__currentMode = Modes.BASE          # ← was None
+        self.__currentMode = Modes.BASE
         self.__awaitingSeed = False
-        self.__lastResult = 0.0
+        self.__lastResult = None
 
     # ==================================================
     # DISPLAY
     # ==================================================
 
-    def setText(self, text, step, operandsNeeded=1, currentMode=None):
+    def setText(self, text, step, data=1, currentMode=None, eventType=None):
         self.__text = text
         self.__step = step
+        self.__eventType = eventType
 
-        if step == EventType.DATA and isinstance(operandsNeeded, int):
-            self.__operandsNeeded = operandsNeeded
-        elif step == EventType.RESULT and isinstance(operandsNeeded, (int, float)):
-            self.__lastResult = float(operandsNeeded)
+        if step == EventType.DATA and isinstance(data, int):
+            self.__operandsNeeded = data
+        elif step == EventType.RESULT:
+            self.__lastResult = data
 
         if currentMode is not None:
             self.__currentMode = currentMode
@@ -40,21 +42,40 @@ class TerminalView(Subscriber, Publisher):
     def showScreen(self):
         print(self.__text)
         match self.__step:
-            case EventType.MODE:      self.__requestMode()
-            case EventType.OPERATION: self.__requestOperation()
-            case EventType.DATA:      self.__requestData()
-            case EventType.RESULT:    self.__requestContinue()
+            case EventType.MODE:
+                self.__requestMode()
+            case EventType.OPERATION:
+                self.__requestOperation()
+            case EventType.DATA:
+                self.__requestData()
+            case EventType.RESULT:
+                if self.__eventType == OutputType.FINAL_RESULT:
+                    sys.exit()
+                elif self.__eventType == OutputType.SCIENTIFIC_RESULT:
+                    self.__requestKeepScientific()
+                elif self.__eventType == OutputType.SECOND_DEGREE_RESULT:
+                    self.__requestKeepSecondDegree()
+                else:
+                    self.__requestContinue()
 
     # ==================================================
-    # INITIAL PROMPT (seed / mode / exit)  — OOP's starter_num
+    # EXIT FLOW
+    # ==================================================
+
+    def __triggerExit(self):
+        """Ask the model for its accumulator and display it, then exit."""
+        self.dispatchEvent(self.eventMap["ExitEvent"])
+        sys.exit()  # fallback if dispatch returns normally
+
+    # ==================================================
+    # INITIAL PROMPT (seed / mode / exit)
     # ==================================================
 
     def __requestMode(self):
         userInput = input("> ").strip().lower()
 
         if userInput == Operations.EXIT.value:
-            print(f"Resultado final: {self.__lastResult}")
-            sys.exit()
+            self.__triggerExit()
 
         mode = self.__strToMode(userInput)
         if mode is not None:
@@ -71,21 +92,19 @@ class TerminalView(Subscriber, Publisher):
             self.showScreen()
             return
 
-        self.__lastResult = seed
         self.__awaitingSeed = False
         self.eventMap["SeedEvent"].setValue(seed)
         self.dispatchEvent(self.eventMap["SeedEvent"])
 
     # ==================================================
-    # OPERATION PROMPT (also handles late mode switches / seed)
+    # OPERATION PROMPT
     # ==================================================
 
     def __requestOperation(self):
         userInput = input("> ").strip().lower()
 
         if userInput == Operations.EXIT.value:
-            print(f"Resultado final: {self.__lastResult}")
-            sys.exit()
+            self.__triggerExit()
 
         mode = self.__strToMode(userInput)
         if mode is not None:
@@ -97,7 +116,6 @@ class TerminalView(Subscriber, Publisher):
         if self.__awaitingSeed:
             try:
                 seed = float(userInput)
-                self.__lastResult = seed
                 self.__awaitingSeed = False
                 self.eventMap["SeedEvent"].setValue(seed)
                 self.dispatchEvent(self.eventMap["SeedEvent"])
@@ -124,21 +142,80 @@ class TerminalView(Subscriber, Publisher):
         for _ in range(self.__operandsNeeded):
             userInput = input("> ").strip()
             if userInput.lower() == Operations.EXIT.value:
-                print(f"Resultado final: {self.__lastResult}")
-                sys.exit()
+                self.__triggerExit()
             operands.append(userInput)
 
         self.eventMap["RecieveDataEvent"].setData(operands)
         self.dispatchEvent(self.eventMap["RecieveDataEvent"])
 
     # ==================================================
-    # RESULT SCREEN
+    # POST-RESULT
     # ==================================================
 
     def __requestContinue(self):
-        # Match OOP: immediately continue to the next operation prompt.
-        # The [Resultado actual: X] line was already printed by the RESULT event.
         self.__requestOperation()
+
+    # ==================================================
+    # KEEP PROMPTS
+    # ==================================================
+
+    def __requestKeepScientific(self):
+        if self.__lastResult is None:
+            self.__requestContinue()
+            return
+
+        saved = input("¿Quieres conservar este resultado? S/N\n").strip().lower()
+
+        if saved == Operations.EXIT.value:
+            self.__triggerExit()
+        if saved == "s":
+            op = input("¿Qué operación quieres aplicar? +, -, x, /\n").strip().lower()
+            operation = self.__strToBaseOperation(op)
+            if operation is None:
+                print("Operación no válida. Resultado descartado.")
+                self.__requestContinue()
+                return
+            self.eventMap["KeepResultEvent"].setOperation(operation)
+            self.eventMap["KeepResultEvent"].setValue(self.__lastResult)
+            self.dispatchEvent(self.eventMap["KeepResultEvent"])
+        else:
+            print("Resultado descartado.")
+            self.__requestContinue()
+
+    def __requestKeepSecondDegree(self):
+        if self.__lastResult is None:
+            self.__requestContinue()
+            return
+
+        x1, x2 = self.__lastResult
+        saved = input("¿Conservar algún resultado? x1/x2/N\n").strip().lower()
+
+        if saved == Operations.EXIT.value:
+            self.__triggerExit()
+        if saved == "x1":
+            chosen = x1
+        elif saved == "x2":
+            chosen = x2
+        else:
+            print("Resultado descartado.")
+            self.__requestContinue()
+            return
+
+        if chosen is None:
+            print("Ese resultado no existe. Descartado.")
+            self.__requestContinue()
+            return
+
+        op = input("¿Qué operación quieres aplicar? +, -, x, /\n").strip().lower()
+        operation = self.__strToBaseOperation(op)
+        if operation is None:
+            print("Operación no válida. Resultado descartado.")
+            self.__requestContinue()
+            return
+
+        self.eventMap["KeepResultEvent"].setOperation(operation)
+        self.eventMap["KeepResultEvent"].setValue(chosen)
+        self.dispatchEvent(self.eventMap["KeepResultEvent"])
 
     # ==================================================
     # PARSERS
@@ -163,3 +240,11 @@ class TerminalView(Subscriber, Publisher):
             case Operations.SECOND_DEGREE.value:  return Operations.SECOND_DEGREE
             case Operations.DECIMAL_TO_HEX.value: return Operations.DECIMAL_TO_HEX
             case _:                               return None
+
+    def __strToBaseOperation(self, operation):
+        match operation:
+            case Operations.ADD.value:      return Operations.ADD
+            case Operations.SUBTRACT.value: return Operations.SUBTRACT
+            case Operations.MULTIPLY.value: return Operations.MULTIPLY
+            case Operations.DIVIDE.value:   return Operations.DIVIDE
+            case _:                         return None

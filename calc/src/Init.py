@@ -37,6 +37,10 @@ class OutputType(Enum):
     DATA_REQUEST = 2
     RESULT = 3
     ERROR = 4
+    FINAL_RESULT = 5
+    SCIENTIFIC_RESULT = 6
+    SECOND_DEGREE_RESULT = 7
+    HEX_RESULT = 8
 
 
 class ResultSelection(Enum):

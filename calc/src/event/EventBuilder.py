@@ -6,6 +6,8 @@ from src.event.ModeSwitchEvent import ModeSwitchEvent
 from src.event.RecieveDataEvent import RecieveDataEvent
 from src.event.UpdateDataEvent import UpdateDataEvent
 from src.event.SeedEvent import SeedEvent
+from src.event.ExitEvent import ExitEvent
+from src.event.KeepResultEvent import KeepResultEvent
 
 
 class EventBuilder(ObjectBuilder, metaclass=SingletonMeta):
@@ -16,5 +18,7 @@ class EventBuilder(ObjectBuilder, metaclass=SingletonMeta):
             "ModeSwitchEvent": ModeSwitchEvent(),
             "RecieveDataEvent": RecieveDataEvent(),
             "UpdateDataEvent": UpdateDataEvent(),
-            "SeedEvent": SeedEvent()
+            "SeedEvent": SeedEvent(),
+            "ExitEvent": ExitEvent(),
+            "KeepResultEvent": KeepResultEvent()
         }

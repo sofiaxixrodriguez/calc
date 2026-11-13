@@ -18,9 +18,7 @@ class DisplayOutputModel(AbstractModel, Publisher):
     def setText(self, eventType, data):
 
         # ------------------------------------------------------
-        # Initial screen (eventType is None):
-        #   mode list + default BASE operations menu
-        #   (mirrors OOP initial_msg() + start_msg())
+        # Initial screen: mode list + default BASE menu
         # ------------------------------------------------------
         if eventType is None:
             self.__text = (
@@ -42,7 +40,7 @@ class DisplayOutputModel(AbstractModel, Publisher):
             return
 
         # ------------------------------------------------------
-        # A mode was selected -> show its operations menu
+        # Mode switch -> show its operations menu
         # ------------------------------------------------------
         if isinstance(eventType, Modes):
             self.__currentMode = eventType
@@ -50,8 +48,7 @@ class DisplayOutputModel(AbstractModel, Publisher):
             return
 
         # ------------------------------------------------------
-        # An operation was selected.
-        # `data` is either the operand count (int) or "INVALID_NUMBER"
+        # Operation selection (data is operand count or "INVALID_NUMBER")
         # ------------------------------------------------------
         if isinstance(eventType, Operations):
             if isinstance(data, str) and data == "INVALID_NUMBER":
@@ -61,15 +58,59 @@ class DisplayOutputModel(AbstractModel, Publisher):
             return
 
         # ------------------------------------------------------
-        # Result of a computation (also fires after a seed)
+        # Accumulator result (seed, + - x /)
         # ------------------------------------------------------
         if eventType == OutputType.RESULT:
             if data is None:
-                self.__text = (
-                    "Error: la operación no produjo un resultado válido."
-                )
+                self.__text = "Error: la operación no produjo un resultado válido."
             else:
                 self.__text = f"[Resultado actual: {data}]"
+            return
+
+        # ------------------------------------------------------
+        # Scientific result (p, f, r) — not the accumulator
+        # ------------------------------------------------------
+        if eventType == OutputType.SCIENTIFIC_RESULT:
+            if data is None:
+                self.__text = "Error: la operación no produjo un resultado válido."
+            else:
+                self.__text = f"[Resultado: {data}]"
+            return
+
+        # ------------------------------------------------------
+        # Second-degree (s) — not the accumulator
+        # ------------------------------------------------------
+        if eventType == OutputType.SECOND_DEGREE_RESULT:
+            if data is None:
+                self.__text = "La ecuación no tiene soluciones reales."
+            else:
+                x1, x2 = data
+                self.__text = f"[Resultado: x1 = {x1}, x2 = {x2}]"
+            return
+
+        # ------------------------------------------------------
+        # Hex conversion: data is (original_value, hex_string)
+        # ------------------------------------------------------
+        if eventType == OutputType.HEX_RESULT:
+            if data is None:
+                self.__text = "Error en la conversión."
+            else:
+                orig, hex_str = data
+                if hex_str is None:
+                    self.__text = "Error: solo se permiten enteros positivos."
+                else:
+                    self.__text = (
+                        f"El número {int(orig)} en hexadecimal es: {hex_str}\n"
+                        f"(Operación informativa: el valor actual no se modifica)"
+                    )
+            return
+
+        # ------------------------------------------------------
+        # Final result (on '=')
+        # ------------------------------------------------------
+        if eventType == OutputType.FINAL_RESULT:
+            self.__text = f"Resultado final: {data}"
+            return
 
     def getText(self):
         return self.__text
@@ -108,22 +149,13 @@ class DisplayOutputModel(AbstractModel, Publisher):
 
     def __operationPrompt(self, operation):
         match operation:
-            case Operations.ADD:
-                return "Introduce el sumando:"
-            case Operations.SUBTRACT:
-                return "Introduce el sustraendo:"
-            case Operations.MULTIPLY:
-                return "Introduce el factor:"
-            case Operations.DIVIDE:
-                return "Introduce el divisor:"
-            case Operations.POWER:
-                return "Introduce base y exponente (uno por línea):"
-            case Operations.FACTORIAL:
-                return "Introduce el número para factorial:"
-            case Operations.SQUARE_ROOT:
-                return "Introduce el número para raíz cuadrada:"
-            case Operations.SECOND_DEGREE:
-                return "Introduce a, b, c (uno por línea):"
-            case Operations.DECIMAL_TO_HEX:
-                return "Introduce el entero positivo a convertir:"
+            case Operations.ADD:            return "Introduce el sumando:"
+            case Operations.SUBTRACT:       return "Introduce el sustraendo:"
+            case Operations.MULTIPLY:       return "Introduce el factor:"
+            case Operations.DIVIDE:         return "Introduce el divisor:"
+            case Operations.POWER:          return "Introduce base y exponente (uno por línea):"
+            case Operations.FACTORIAL:      return "Introduce el número para factorial:"
+            case Operations.SQUARE_ROOT:    return "Introduce el número para raíz cuadrada:"
+            case Operations.SECOND_DEGREE:  return "Introduce a, b, c (uno por línea):"
+            case Operations.DECIMAL_TO_HEX: return "Introduce el entero positivo a convertir:"
         return "Introduce datos:"

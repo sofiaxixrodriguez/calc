@@ -6,6 +6,8 @@ from multipledispatch import dispatch
 from src.event.ExecuteOperationEvent import ExecuteOperationEvent
 from src.event.RecieveDataEvent import RecieveDataEvent
 from src.event.SeedEvent import SeedEvent
+from src.event.ExitEvent import ExitEvent
+from src.event.KeepResultEvent import KeepResultEvent
 
 from src.Init import Operations
 
@@ -34,25 +36,13 @@ class ExecuteOperationController(AbstractController, Subscriber):
         self.displayOutputModel = displayOutputModel
 
     # ==================================================
-    # SEED (starter number)
-    # ==================================================
-    
-    @dispatch(SeedEvent)
-    def onEventReceived(self, event):
-        self.executeOperationModel.setSeed(event.getValue())
-    
-    # ==================================================
     # OPERATION SELECTION
     # ==================================================
 
     @dispatch(ExecuteOperationEvent)
     def onEventReceived(self, event):
-
         self.__currentOperation = event.getOperation()
-
-        self.executeOperationModel.setOperation(
-            self.__currentOperation
-        )
+        self.executeOperationModel.setOperation(self.__currentOperation)
 
     # ==================================================
     # DATA RECEPTION
@@ -60,103 +50,57 @@ class ExecuteOperationController(AbstractController, Subscriber):
 
     @dispatch(RecieveDataEvent)
     def onEventReceived(self, event):
-
         rawData = event.getData()
-
-        parsedData = self.__parseData(
-            self.__currentOperation,
-            rawData
-        )
-
+        parsedData = self.__parseData(self.__currentOperation, rawData)
         if parsedData is None:
             return
+        self.executeOperationModel.execute(self.__currentOperation, parsedData)
 
-        self.executeOperationModel.execute(
-            self.__currentOperation,
-            parsedData
+    # ==================================================
+    # SEED
+    # ==================================================
+
+    @dispatch(SeedEvent)
+    def onEventReceived(self, event):
+        self.executeOperationModel.setSeed(event.getValue())
+
+    # ==================================================
+    # KEEP RESULT (from scientific keep flow)
+    # ==================================================
+
+    @dispatch(KeepResultEvent)
+    def onEventReceived(self, event):
+        self.executeOperationModel.executeKept(
+            event.getOperation(),
+            event.getValue()
         )
+
+    # ==================================================
+    # EXIT (=) — ask model to dispatch FINAL_RESULT
+    # ==================================================
+
+    @dispatch(ExitEvent)
+    def onEventReceived(self, event):
+        self.executeOperationModel.dispatchFinalResult()
 
     # ==================================================
     # INPUT PARSING
     # ==================================================
 
     def __parseData(self, operation, data):
-
         try:
-
             match operation:
-
-                # -------------------------
-                # BASE OPERATIONS
-                # -------------------------
-
-                case Operations.ADD:
-                    return [float(data[0])]
-
-                case Operations.SUBTRACT:
-                    return [float(data[0])]
-
-                case Operations.MULTIPLY:
-                    return [float(data[0])]
-
-                case Operations.DIVIDE:
-                    return [float(data[0])]
-
-                # -------------------------
-                # SCIENTIFIC
-                # -------------------------
-
-                case Operations.POWER:
-
-                    return [
-                        float(data[0]),
-                        float(data[1])
-                    ]
-
-                case Operations.FACTORIAL:
-
-                    return [
-                        float(data[0])
-                    ]
-
-                case Operations.SQUARE_ROOT:
-
-                    return [
-                        float(data[0])
-                    ]
-
-                case Operations.SECOND_DEGREE:
-
-                    return [
-                        float(data[0]),
-                        float(data[1]),
-                        float(data[2])
-                    ]
-
-                # -------------------------
-                # PROGRAMMING
-                # -------------------------
-
-                case Operations.DECIMAL_TO_HEX:
-
-                    return [
-                        float(data[0])
-                    ]
-
-                case _:
-
-                    return None
-
+                case Operations.ADD:            return [float(data[0])]
+                case Operations.SUBTRACT:       return [float(data[0])]
+                case Operations.MULTIPLY:       return [float(data[0])]
+                case Operations.DIVIDE:         return [float(data[0])]
+                case Operations.POWER:          return [float(data[0]), float(data[1])]
+                case Operations.FACTORIAL:      return [float(data[0])]
+                case Operations.SQUARE_ROOT:    return [float(data[0])]
+                case Operations.SECOND_DEGREE:  return [float(data[0]), float(data[1]), float(data[2])]
+                case Operations.DECIMAL_TO_HEX: return [float(data[0])]
+                case _:                         return None
         except ValueError:
-
-            self.executeOperationModel.eventMap[
-                "UpdateDataEvent"
-            ].setData(
-                "INVALID_NUMBER"
-            )
-
-            self.executeOperationModel.eventMap[
-                "UpdateDataEvent"
-            ].notifyAll()
-
+            self.executeOperationModel.eventMap["UpdateDataEvent"].setData("INVALID_NUMBER")
+            self.executeOperationModel.eventMap["UpdateDataEvent"].notifyAll()
             return None
