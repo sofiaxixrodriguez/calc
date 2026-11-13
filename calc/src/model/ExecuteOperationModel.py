@@ -53,16 +53,29 @@ class ExecuteOperationModel(AbstractModel, Publisher):
         )
 
     def setSeed(self, value):
-        """Sets the starting accumulator without performing an operation."""
+        """Sets the starting accumulator without performing an operation.
+           Dispatches RESULT so the user sees [Resultado actual: X]
+           immediately, matching the OOP calculator's starter_num flow."""
+
         self.__result = value
         self.__operation = Operations.NONE
-    
-        self.eventMap["UpdateDataEvent"].setStep(EventType.OPERATION)
-        self.eventMap["UpdateDataEvent"].setType(OutputType.MAIN_MENU)
-        self.eventMap["UpdateDataEvent"].setData(None)
-    
-        self.dispatchEvent(self.eventMap["UpdateDataEvent"])
-    
+
+        self.eventMap["UpdateDataEvent"].setStep(
+            EventType.RESULT
+        )
+
+        self.eventMap["UpdateDataEvent"].setType(
+            OutputType.RESULT
+        )
+
+        self.eventMap["UpdateDataEvent"].setData(
+            value
+        )
+
+        self.dispatchEvent(
+            self.eventMap["UpdateDataEvent"]
+        )
+
     # ==================================================
     # OPERAND COUNT
     # ==================================================

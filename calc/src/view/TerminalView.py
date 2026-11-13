@@ -15,8 +15,9 @@ class TerminalView(Subscriber, Publisher):
         self.__text = ""
         self.__step = EventType.MODE
         self.__operandsNeeded = 1
-        self.__currentMode = None
+        self.__currentMode = Modes.BASE          # ← was None
         self.__awaitingSeed = False
+        self.__lastResult = 0.0
 
     # ==================================================
     # DISPLAY
@@ -25,11 +26,15 @@ class TerminalView(Subscriber, Publisher):
     def setText(self, text, step, operandsNeeded=1, currentMode=None):
         self.__text = text
         self.__step = step
-        # Only update operand count for real integers — never for error strings.
-        if isinstance(operandsNeeded, int):
+
+        if step == EventType.DATA and isinstance(operandsNeeded, int):
             self.__operandsNeeded = operandsNeeded
+        elif step == EventType.RESULT and isinstance(operandsNeeded, (int, float)):
+            self.__lastResult = float(operandsNeeded)
+
         if currentMode is not None:
             self.__currentMode = currentMode
+
         self.showScreen()
 
     def showScreen(self):
@@ -41,36 +46,47 @@ class TerminalView(Subscriber, Publisher):
             case EventType.RESULT:    self.__requestContinue()
 
     # ==================================================
-    # MODE SELECTION (first prompt after init)
+    # INITIAL PROMPT (seed / mode / exit)  — OOP's starter_num
     # ==================================================
 
     def __requestMode(self):
-        userInput = input().strip().lower()
+        userInput = input("> ").strip().lower()
 
         if userInput == Operations.EXIT.value:
+            print(f"Resultado final: {self.__lastResult}")
             sys.exit()
 
         mode = self.__strToMode(userInput)
-        if mode is None:
+        if mode is not None:
+            self.__currentMode = mode
+            self.__awaitingSeed = True
+            self.eventMap["ModeSwitchEvent"].setMode(mode)
+            self.dispatchEvent(self.eventMap["ModeSwitchEvent"])
+            return
+
+        try:
+            seed = float(userInput)
+        except ValueError:
+            print("No es un número válido ni un modo. Intenta de nuevo.")
             self.showScreen()
             return
 
-        self.__currentMode = mode
-        self.__awaitingSeed = True          # first operation prompt expects a number
-        self.eventMap["ModeSwitchEvent"].setMode(mode)
-        self.dispatchEvent(self.eventMap["ModeSwitchEvent"])
+        self.__lastResult = seed
+        self.__awaitingSeed = False
+        self.eventMap["SeedEvent"].setValue(seed)
+        self.dispatchEvent(self.eventMap["SeedEvent"])
 
     # ==================================================
-    # OPERATION (or seed number the first time)
+    # OPERATION PROMPT (also handles late mode switches / seed)
     # ==================================================
 
     def __requestOperation(self):
-        userInput = input().strip().lower()
+        userInput = input("> ").strip().lower()
 
         if userInput == Operations.EXIT.value:
+            print(f"Resultado final: {self.__lastResult}")
             sys.exit()
 
-        # Allow switching mode from the operation prompt
         mode = self.__strToMode(userInput)
         if mode is not None:
             self.__currentMode = mode
@@ -78,19 +94,20 @@ class TerminalView(Subscriber, Publisher):
             self.dispatchEvent(self.eventMap["ModeSwitchEvent"])
             return
 
-        # First prompt after a mode selection: treat number as seed
         if self.__awaitingSeed:
             try:
                 seed = float(userInput)
+                self.__lastResult = seed
                 self.__awaitingSeed = False
                 self.eventMap["SeedEvent"].setValue(seed)
                 self.dispatchEvent(self.eventMap["SeedEvent"])
                 return
             except ValueError:
-                pass  # fall through to try as operation
+                pass
 
         operation = self.__strToOperation(userInput)
         if operation is None:
+            print("Operación no reconocida. Intenta de nuevo.")
             self.showScreen()
             return
 
@@ -105,8 +122,9 @@ class TerminalView(Subscriber, Publisher):
     def __requestData(self):
         operands = []
         for _ in range(self.__operandsNeeded):
-            userInput = input().strip()
+            userInput = input("> ").strip()
             if userInput.lower() == Operations.EXIT.value:
+                print(f"Resultado final: {self.__lastResult}")
                 sys.exit()
             operands.append(userInput)
 
@@ -118,10 +136,9 @@ class TerminalView(Subscriber, Publisher):
     # ==================================================
 
     def __requestContinue(self):
-        input("\nPresiona ENTER para continuar...")
-        if self.__currentMode is not None:
-            self.eventMap["ModeSwitchEvent"].setMode(self.__currentMode)
-            self.dispatchEvent(self.eventMap["ModeSwitchEvent"])
+        # Match OOP: immediately continue to the next operation prompt.
+        # The [Resultado actual: X] line was already printed by the RESULT event.
+        self.__requestOperation()
 
     # ==================================================
     # PARSERS

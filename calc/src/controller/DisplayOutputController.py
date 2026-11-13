@@ -36,17 +36,23 @@ class DisplayOutputController(AbstractController, Subscriber):
         step = event.getStep()
         data = event.getData()
 
+        # DisplayOutputModel owns ALL text
         self.displayOutputModel.setText(
             eventType,
             data
         )
 
+        # A mode was selected -> surface it to the view so it can
+        # remember the current mode for "return to operation prompt"
         currentMode = None
 
         if isinstance(eventType, Modes):
             currentMode = eventType
 
-        if step == EventType.DATA:
+        # DATA events carry the operand count (int).
+        # RESULT events carry the actual result (float / tuple / str / None).
+        # Both must be forwarded verbatim — not replaced by a placeholder.
+        if step in (EventType.DATA, EventType.RESULT):
 
             self.terminalView.setText(
                 self.displayOutputModel.getText(),
@@ -55,6 +61,8 @@ class DisplayOutputController(AbstractController, Subscriber):
                 currentMode
             )
 
+        # MODE / OPERATION / MESSAGE events have nothing extra to forward,
+        # so pass a neutral operand count of 1.
         else:
 
             self.terminalView.setText(
